@@ -4,9 +4,9 @@ pipeline {
     environment {
         IMAGE_NAME = "nour292/examen"
         TAG = "latest"
-        DOCKERHUB_CREDS = "dockerhub-creds" // ID des credentials Docker Hub
-        SLACK_CHANNEL = "#general"          // mettre ton channel Slack
-        SLACK_CREDENTIALS = "slack-token"   // token ou credentials Slack dans Jenkins
+        DOCKERHUB_CREDS = "dockerhub-creds" // ID des credentials Docker Hub dans Jenkins
+        // SLACK_CHANNEL = "#general"        // Slack désactivé pour l'instant
+        // SLACK_CREDENTIALS = "slack-token"
     }
 
     triggers {
@@ -26,10 +26,10 @@ pipeline {
         stage('Docker Build') {
             steps {
                 echo "Construction de l’image Docker basée sur Nginx"
-                sh '''
-                    docker build -t ${IMAGE_NAME}:${TAG} .
-                    docker tag ${IMAGE_NAME}:${TAG} ${IMAGE_NAME}:latest
-                '''
+                bat """
+                    docker build -t %IMAGE_NAME%:%TAG% .
+                    docker tag %IMAGE_NAME%:%TAG% %IMAGE_NAME%:latest
+                """
             }
         }
 
@@ -41,11 +41,11 @@ pipeline {
                     usernameVariable: 'USER',
                     passwordVariable: 'PASS'
                 )]) {
-                    sh '''
-                        echo "$PASS" | docker login -u "$USER" --password-stdin
-                        docker push ${IMAGE_NAME}:${TAG}
-                        docker push ${IMAGE_NAME}:latest
-                    '''
+                    bat """
+                        echo %PASS% | docker login -u %USER% --password-stdin
+                        docker push %IMAGE_NAME%:%TAG%
+                        docker push %IMAGE_NAME%:latest
+                    """
                 }
             }
         }
@@ -53,20 +53,27 @@ pipeline {
 
     post {
         success {
+            echo "Pipeline réussi : Image %IMAGE_NAME%:%TAG% buildée et poussée avec succès !"
+            // Pour activer Slack, décommente le bloc ci-dessous et installe le plugin Slack
+            /*
             slackSend(
                 channel: "${SLACK_CHANNEL}",
                 color: 'good',
                 message: "Pipeline réussi : Image ${IMAGE_NAME}:${TAG} buildée et poussée avec succès !",
                 tokenCredentialId: "${SLACK_CREDENTIALS}"
             )
+            */
         }
         failure {
+            echo "Pipeline échoué pour le projet %IMAGE_NAME% !"
+            /*
             slackSend(
                 channel: "${SLACK_CHANNEL}",
                 color: 'danger',
                 message: "Pipeline échoué pour le projet ${IMAGE_NAME} !",
                 tokenCredentialId: "${SLACK_CREDENTIALS}"
             )
+            */
         }
     }
 }
