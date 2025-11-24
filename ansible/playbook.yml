@@ -1,0 +1,8 @@
+---
+- hosts: all
+  become: yes
+  roles:
+    - terraform
+    - update_upgrade
+    - docker
+    - jenkins
