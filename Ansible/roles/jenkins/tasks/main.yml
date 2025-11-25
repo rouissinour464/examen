@@ -1,0 +1,85 @@
+
+---
+- name: Install dependencies
+  apt:
+    name:
+      - openjdk-17-jdk
+      - gnupg
+      - curl
+      - ca-certificates
+      - lsb-release
+    state: present
+    update_cache: yes
+
+- name: Ensure keyrings directory exists
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Add Jenkins GPG key (keyring)
+  shell: |
+    curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io.key | gpg --dearmor -o /etc/apt/keyrings/jenkins.gpg
+  args:
+    creates: /etc/apt/keyrings/jenkins.gpg
+
+- name: Add Jenkins repository (using keyring)
+  apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/jenkins.gpg] https://pkg.jenkins.io/debian-stable binary/"
+    state: present
+    filename: jenkins
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install Jenkins via repository
+  apt:
+    name: jenkins
+    state: latest
+    force_apt_get: yes
+  register: jenkins_install_repo
+  ignore_errors: yes
+
+# Fallback si le repo échoue (timeout)
+- name: Fallback | Download Jenkins .deb
+  when: jenkins_install_repo is failed
+  get_url:
+    url: "https://pkg.jenkins.io/debian-stable/binary/jenkins_2.528.2_all.deb"
+    dest: /tmp/jenkins.deb
+    mode: '0644'
+    timeout: 300
+
+- name: Fallback | Install Jenkins from .deb
+  when: jenkins_install_repo is failed
+  apt:
+    deb: /tmp/jenkins.deb
+
+- name: Ensure Jenkins is enabled and started
+  systemd:
+    name: jenkins
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+# Optionnel : ouvrir le port 8080 si UFW est actif
+- name: Allow Jenkins through UFW (if enabled)
+  shell: |
+    if ufw status | grep -q "Status: active"; then
+      ufw allow 8080/tcp
+    fi
+  changed_when: false
+
+# Lecture et affichage du mot de passe initial
+- name: Read Jenkins initial admin password
+  slurp:
+    src: /var/lib/jenkins/secrets/initialAdminPassword
+  register: jenkins_admin_pw
+  changed_when: false
+  failed_when: false
+
+- name: Show Jenkins initial admin password
+  debug:
+    msg: "InitialAdminPassword: {{ (jenkins_admin_pw.content | b64decode) if (jenkins_admin_pw is defined and jenkins_admin_pw.content is defined) else 'N/A' }}"
+  changed_when: false
+
