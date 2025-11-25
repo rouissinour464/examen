@@ -1,79 +1,105 @@
+
 pipeline {
-    agent any
+  agent any
 
-    environment {
-        IMAGE_NAME = "nour292/examen"
-        TAG = "latest"
-        DOCKERHUB_CREDS = "dockerhub-creds" // ID des credentials Docker Hub dans Jenkins
-        // SLACK_CHANNEL = "#general"        // Slack désactivé pour l'instant
-        // SLACK_CREDENTIALS = "slack-token"
+  environment {
+    IMAGE_NAME        = "nour292/examen"        // Repo Docker Hub
+    DOCKERHUB_CREDS   = "dockerhub-creds"       // Jenkins credentials ID (Username + Access Token)
+    SLACK_CHANNEL     = "#general"              // Canal Slack (ex: #cicd)
+    SLACK_CREDENTIALS = "slack-token"           // Jenkins credentials ID (Secret text du token Slack)
+    BRANCH            = "main"                  // Branche Git
+    GIT_URL           = "https://github.com/rouissinour464/examen.git"
+    IMAGE_TAG         = ""                      // défini dynamiquement
+  }
+
+  // Poll SCM toutes les 5 minutes
+  triggers {
+    pollSCM('H/5 * * * *')
+  }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        echo "Récupération du code depuis GitHub"
+        git branch: env.BRANCH, url: env.GIT_URL
+      }
     }
 
-    triggers {
-        pollSCM('H/5 * * * *') // Scrute le dépôt toutes les 5 minutes
+    stage('Set Tag') {
+      steps {
+        script {
+          // Récupérer le short SHA (Windows via git)
+          def commit = bat(script: 'git rev-parse --short HEAD', returnStdout: true)
+                        .trim()
+                        .split("\\r?\\n")
+                        .last()
+                        .trim()
+          env.IMAGE_TAG = "${env.BUILD_NUMBER}-${commit}"
+          echo "Tag d'image = ${env.IMAGE_TAG}"
+        }
+      }
     }
 
-    stages {
-
-        stage('Checkout') {
-            steps {
-                echo "Récupération du code depuis GitHub"
-                git branch: 'main',
-                    url: 'https://github.com/rouissinour464/examen.git'
-            }
-        }
-
-        stage('Docker Build') {
-            steps {
-                echo "Construction de l’image Docker basée sur Nginx"
-                bat """
-                    docker build -t %IMAGE_NAME%:%TAG% .
-                    docker tag %IMAGE_NAME%:%TAG% %IMAGE_NAME%:latest
-                """
-            }
-        }
-
-        stage('Docker Push') {
-            steps {
-                echo "Push de l’image Docker vers Docker Hub"
-                withCredentials([usernamePassword(
-                    credentialsId: "${DOCKERHUB_CREDS}",
-                    usernameVariable: 'USER',
-                    passwordVariable: 'PASS'
-                )]) {
-                    bat """
-                        echo %PASS% | docker login -u %USER% --password-stdin
-                        docker push %IMAGE_NAME%:%TAG%
-                        docker push %IMAGE_NAME%:latest
-                    """
-                }
-            }
-        }
+    stage('Docker Build') {
+      steps {
+        echo "Construction de l’image Docker basée sur Nginx"
+        bat """
+          docker version
+          docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+          docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
+        """
+      }
     }
 
-    post {
-        success {
-            echo "Pipeline réussi : Image %IMAGE_NAME%:%TAG% buildée et poussée avec succès !"
-            // Pour activer Slack, décommente le bloc ci-dessous et installe le plugin Slack
-            /*
-            slackSend(
-                channel: "${SLACK_CHANNEL}",
-                color: 'good',
-                message: "Pipeline réussi : Image ${IMAGE_NAME}:${TAG} buildée et poussée avec succès !",
-                tokenCredentialId: "${SLACK_CREDENTIALS}"
-            )
-            */
+    stage('Docker Push') {
+      steps {
+        echo "Push de l’image Docker vers Docker Hub"
+        withCredentials([
+          usernamePassword(credentialsId: "${DOCKERHUB_CREDS}", usernameVariable: 'USER', passwordVariable: 'PASS')
+        ]) {
+          bat """
+            echo %PASS% | docker login -u %USER% --password-stdin
+            docker push ${IMAGE_NAME}:${IMAGE_TAG}
+            docker push ${IMAGE_NAME}:latest
+            docker logout
+          """
         }
-        failure {
-            echo "Pipeline échoué pour le projet %IMAGE_NAME% !"
-            /*
-            slackSend(
-                channel: "${SLACK_CHANNEL}",
-                color: 'danger',
-                message: "Pipeline échoué pour le projet ${IMAGE_NAME} !",
-                tokenCredentialId: "${SLACK_CREDENTIALS}"
-            )
-            */
-        }
+      }
     }
+  }
+
+  post {
+    success {
+      script {
+        echo "✅ Pipeline réussi : Image ${IMAGE_NAME}:${IMAGE_TAG} buildée et poussée !"
+        // Notification Slack via plugin
+        slackSend(
+          channel: "${SLACK_CHANNEL}",
+          color: 'good',
+          message: "✅ *SUCCÈS* — ${env.JOB_NAME} #${env.BUILD_NUMBER}\nTag: `${env.IMAGE_TAG}`\nImage: `${env.IMAGE_NAME}`\nVoir: ${env.BUILD_URL}",
+          tokenCredentialId: "${SLACK_CREDENTIALS}"
+        )
+      }
+    }
+    failure {
+      script {
+        echo "❌ Pipeline échoué pour le projet ${IMAGE_NAME} !"
+        slackSend(
+          channel: "${SLACK_CHANNEL}",
+          color: 'danger',
+          message: "❌ *ÉCHEC* — ${env.JOB_NAME} #${env.BUILD_NUMBER}\nVoir: ${env.BUILD_URL}",
+          tokenCredentialId: "${SLACK_CREDENTIALS}"
+        )
+      }
+    }
+    always {
+      cleanWs()
+    }
+  }
 }
