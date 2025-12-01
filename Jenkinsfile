@@ -4,9 +4,9 @@ pipeline {
     environment {
         IMAGE_NAME = "nour292/examen"
         TAG = "latest"
-        DOCKERHUB_CREDS = "dockerhub-creds"    // ID credentials DockerHub
-        SLACK_CHANNEL = "#test"                 // Ton channel Slack
-        SLACK_CREDENTIALS = "slack-token"      // ID credentials Slack dans Jenkins
+        DOCKERHUB_CREDS = "dockerhub-creds"   // ID credentials DockerHub
+        SLACK_CHANNEL = "#test"                // Channel Slack
+        SLACK_CREDENTIALS = "slack-token"     // ID credentials Slack dans Jenkins
     }
 
     triggers {
@@ -18,7 +18,7 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 // Récupération du code depuis GitHub
-                git branch: 'main', url: 'https://github.com/rouissinour464/examen.git'
+                git branch: 'nouvelle-branche', url: 'https://github.com/rouissinour464/examen.git'
             }
         }
 
