@@ -10,7 +10,7 @@ pipeline {
     }
 
     triggers {
-        pollSCM('H/5 * * * *') // Scrute le dépôt toutes les 5 minutes
+        cron('H/5 * * * *') // Scrute le dépôt toutes les 5 minutes
     }
 
     stages {
