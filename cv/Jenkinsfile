@@ -27,15 +27,20 @@ pipeline {
                     usernameVariable: 'USER',
                     passwordVariable: 'PASS'
                 )]) {
-                    script {
-                        bat """
-                            docker login -u %USER% -p %PASS%
-                            docker build -t ${env.IMAGE_NAME}:${env.TAG} .
-                            docker tag ${env.IMAGE_NAME}:${env.TAG} ${env.IMAGE_NAME}:latest
-                            docker push ${env.IMAGE_NAME}:${env.TAG}
-                            docker push ${env.IMAGE_NAME}:latest
-                        """
-                    }
+                    sh """
+                        echo "Connexion à DockerHub..."
+                        echo "$PASS" | docker login -u "$USER" --password-stdin
+
+                        echo "Construction de l'image Docker..."
+                        docker build -t ${IMAGE_NAME}:${TAG} .
+
+                        echo "Tagging de l'image..."
+                        docker tag ${IMAGE_NAME}:${TAG} ${IMAGE_NAME}:latest
+
+                        echo "Push de l'image vers DockerHub..."
+                        docker push ${IMAGE_NAME}:${TAG}
+                        docker push ${IMAGE_NAME}:latest
+                    """
                 }
             }
         }
@@ -43,10 +48,10 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline réussi : Image ${env.IMAGE_NAME}:${env.TAG} buildée et poussée !"
+            echo "Pipeline réussi : Image ${IMAGE_NAME}:${TAG} buildée et poussée !"
         }
         failure {
-            echo "Pipeline échoué pour le projet ${env.IMAGE_NAME} !"
+            echo "Pipeline échoué pour le projet ${IMAGE_NAME} !"
         }
     }
 }
