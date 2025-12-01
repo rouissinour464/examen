@@ -18,7 +18,7 @@ pipeline {
                 withCredentials([usernamePassword(
                     credentialsId: "${DOCKERHUB_CREDS}",
                     usernameVariable: 'USER',
-                    passwordVariable: 'PASS"
+                    passwordVariable: 'PASS'
                 )]) {
                     sh '''
                         echo "Connexion à DockerHub..."
