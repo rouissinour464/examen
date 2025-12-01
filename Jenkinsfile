@@ -5,7 +5,7 @@ pipeline {
         IMAGE_NAME = "nour292/examen"
         TAG = "latest"
         DOCKERHUB_CREDS = "dockerhub-creds"
-        SLACK_CHANNEL = "#general"         // Ton channel Slack
+        SLACK_CHANNEL = "#test"         // Ton channel Slack
         SLACK_CREDENTIALS = "slack-token" // ID credentials Slack dans Jenkins
     }
 
