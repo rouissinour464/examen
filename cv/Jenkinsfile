@@ -12,13 +12,6 @@ pipeline {
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                echo "Récupération du code depuis GitHub"
-                git branch: 'main',
-                    url: 'https://github.com/rouissinour464/examen.git'
-            }
-        }
 
         stage('Docker Build & Push') {
             steps {
@@ -27,7 +20,7 @@ pipeline {
                     usernameVariable: 'USER',
                     passwordVariable: 'PASS'
                 )]) {
-                    sh """
+                    sh '''
                         echo "Connexion à DockerHub..."
                         echo "$PASS" | docker login -u "$USER" --password-stdin
 
@@ -40,7 +33,7 @@ pipeline {
                         echo "Push de l'image vers DockerHub..."
                         docker push ${IMAGE_NAME}:${TAG}
                         docker push ${IMAGE_NAME}:latest
-                    """
+                    '''
                 }
             }
         }
